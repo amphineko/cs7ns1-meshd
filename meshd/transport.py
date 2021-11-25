@@ -1,6 +1,7 @@
 import socket
 import struct
 from utils import hash_payload
+from time import sleep
 
 DISCOVERY_PORT = 0
 SENSOR_PORT = 33211
@@ -28,10 +29,18 @@ class Transport:
         return None
 
     def read_sensor(self):
-        '''
-            Read protocol packets from the our sensors
-        '''
-        return None
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        hostname = socket.gethostname()
+        ip_addr = socket.gethostbyname(hostname)
+        sock.bind((ip_addr, SENSOR_PORT))
+        sock.listen()
+        print("Listening for sensor connections on : " + str(ip_addr) + ":" + str(SENSOR_PORT))
+        while True:
+            print("Trying to get data from sensor")
+            conn, addr = sock.accept()
+            data = conn.recv(1024)
+            print("Data recieved: " + str(data))
+            sleep(2)
 
     def send_to_peers(self, data):
         fail_set = set()

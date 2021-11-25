@@ -23,9 +23,6 @@ class Sensor:
         self.pressure = 35
         self.current_step = 0
 
-        self.sync_node_host = ''
-        self.sync_node_port = 33215
-
 
     def generate_data(self, sensorType):
         metricMap = {'position': self.getPos(),
@@ -42,16 +39,19 @@ class Sensor:
         return metricMap.get(sensorType)
 
     def send_data(self, data):
-        try:
-            print('Sending Data to Sync Node \n')
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.connect(p)
-            hash = hash_payload(data)
-            packet = struct.pack('!32s%ds' % len(data), hash, data)
-            sock.send(packet)
-            sock.close()
-        except:
-            print('Sending data to sync node failed. \n')
+        hostname = socket.gethostname()
+        print("Hostname : " + socket.gethostbyname(hostname) + " Port : " + self.port)
+        print('Sending Data to Sync Node \n')
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect_ex((socket.gethostbyname(hostname), int(self.port)))
+        data = str(data)
+        print("Data : " +  data)
+        #hash = hash_payload(bytes(data, 'utf-8'))
+        #packet = struct.pack(hash, da
+        byte_data = bytes(data, 'utf-8')
+        print(byte_data)
+        sock.send(byte_data)
+        sock.close()
 
     def getPressure(self):
         self.pressure = self.pressure - random.uniform(0, 0.5)
