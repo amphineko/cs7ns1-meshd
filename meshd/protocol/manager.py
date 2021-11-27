@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from typing import Dict
 from uuid import UUID
 
 
@@ -9,7 +10,7 @@ class ClosableProtocolConnection:
 
 
 class ProtocolConnectionManager:
-    peers: dict[UUID, ClosableProtocolConnection]
+    peers: Dict[UUID, ClosableProtocolConnection]
 
     def __init__(self):
         self.peers = {}
