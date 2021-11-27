@@ -2,6 +2,7 @@ import hashlib
 
 SHARED_KEY = b'meshd'
 
+
 def hash_payload(payload):
     """
     Calculate the hash of the payload using the shared key.

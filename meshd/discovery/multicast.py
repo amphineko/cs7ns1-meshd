@@ -2,7 +2,7 @@ import socket
 import struct
 from uuid import UUID
 
-from utils import hash_payload
+from meshd.utils.sign import hash_payload
 
 MCAST_GROUP = '224.1.1.1'
 MCAST_PORT = 33210
@@ -11,10 +11,10 @@ MCAST_TTL = 2
 SHARED_KEY = b'meshd'
 
 
-class Discovery:
-    def __init__(self, protocol_port: int, session: UUID, mcast_group=MCAST_GROUP, mcast_port=MCAST_PORT):
+class MulticastDiscovery:
+    def __init__(self, protocol_port: int, local_session: UUID, mcast_group=MCAST_GROUP, mcast_port=MCAST_PORT):
         self.protocol_port = protocol_port
-        self.session = session
+        self.session = local_session
 
         self.group = mcast_group
         self.port = mcast_port
@@ -24,7 +24,8 @@ class Discovery:
     def close(self):
         self.sock.close()
 
-    def create_socket(cls, group, port):
+    @staticmethod
+    def create_socket(group, port):
         # create udp socket
         sock = socket.socket(
             socket.AF_INET,
@@ -38,28 +39,32 @@ class Discovery:
         sock.bind(('', port))
 
         # join multicast group
-        mreq = struct.pack('=4sl', socket.inet_aton(group), socket.INADDR_ANY)
-        sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+        join_req = struct.pack('=4sl', socket.inet_aton(group), socket.INADDR_ANY)
+        sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, join_req)
 
         return sock
 
-    def read(self):
+    def read(self, read_timeout=None):
         len_packet = 32 + 16 + 2  # 32 bytes hash, 16 bytes session, 2 bytes port
 
-        # verify packet length
-        bytes, (remote_addr, remote_port) = self.sock.recvfrom(len_packet)
-        if (len_packet != len(bytes)):
-            print('Received packet of wrong size %d from %s:%d' % (len(bytes), remote_addr, remote_port))
+        # receive packet
+        self.sock.settimeout(read_timeout)
+        try:
+            buf, (remote_addr, remote_port) = self.sock.recvfrom(len_packet)
+        except socket.timeout:
+            return None
+        if len_packet != len(buf):
+            print('Received packet of wrong size %d from %s:%d' % (len(buf), remote_addr, remote_port))
             return None
 
         # verify payload hash against shared key
-        hash, payload = struct.unpack('!32s%ds' % (len(bytes) - 32), bytes)
-        if hash != hash_payload(payload):
+        payload_hash, payload = struct.unpack('!32s%ds' % (len(buf) - 32), buf)
+        if payload_hash != hash_payload(payload):
             print('Received packet of wrong hash from %s:%d' % (remote_addr, remote_port))
             return None
 
         # decode payload
-        _, session, protocol_port = struct.unpack('!32s16sH', bytes)
+        _, session, protocol_port = struct.unpack('!32s16sH', buf)
         session = UUID(bytes=session)
 
         return session, (remote_addr, protocol_port)
@@ -67,8 +72,8 @@ class Discovery:
     def send(self):
         # encode payload and hash
         payload = struct.pack('!16sH', self.session.bytes, self.protocol_port)
-        hash = hash_payload(payload)
+        payload_hash = hash_payload(payload)
 
         # construct and send packet
-        packet = struct.pack('!32s%ds' % len(payload), hash, payload)
+        packet = struct.pack('!32s%ds' % len(payload), payload_hash, payload)
         self.sock.sendto(packet, (self.group, self.port))
