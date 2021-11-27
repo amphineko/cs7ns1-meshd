@@ -3,12 +3,15 @@
 from threading import Event, Thread
 from time import sleep
 from uuid import UUID, uuid4
+import argparse
 
 from discovery import Discovery
 from server import Protocol
 from transport import Transport
 
-DISCOVERY_INTERVAL = 1
+DISCOVERY_INTERVAL = 3
+SENSOR_INTERVAL = 2
+PEER_INTERVAL = 1
 
 def read_discovery(discovery, transport, stop: Event):
     '''
@@ -20,7 +23,8 @@ def read_discovery(discovery, transport, stop: Event):
             continue
 
         session, (addr, port) = read_result
-        transport.update_peers_set(session, addr, port)
+        transport.update_peers_map(session, addr, port, discovery.protocol_port)
+        sleep(DISCOVERY_INTERVAL)
 
 def send_discovery(discovery: Discovery, stop: Event):
     '''
@@ -30,32 +34,41 @@ def send_discovery(discovery: Discovery, stop: Event):
         discovery.send()
         sleep(DISCOVERY_INTERVAL)
 
-def read_sensor(transport, stop: Event):
+def read_sensor(transport: Transport, stop: Event):
     '''
         Read protocol packets from the our sensor (data generation) nodes
     '''
     while not stop.is_set():
-        read_result = transport.read_sensor()
-        if read_result is None:
-            continue
+        transport.read_sensor()
+        sleep(SENSOR_INTERVAL)
 
-def read_peer_sensor(transport, stop: Event):
+def read_peer_sensor(transport: Transport, stop: Event):
     '''
        Read protocol packets from the our peers
     '''
     while not stop.is_set():
-        read_result = transport.read_peer()
-        if read_result is None:
-            continue
+        transport.read_peer()
+        # sleep(PEER_INTERVAL)
 
 if __name__ == '__main__':
     try:
-        session = uuid4()
-        print('Session %s started' % (session))
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--sensorport', help='Sensor Port Specification', required=True)
+        args = parser.parse_args()
 
-        protocol = Protocol()
+        if args.sensorport is None:
+            print("Please specify the type of sensor")
+            exit(1)
+
+        sensor_port = int(args.sensorport)
+
+        session = uuid4()
+        print('Session %s started \n' % (session))
+
+        protocol = Protocol(None)
+        sensor_protocol = Protocol(sensor_port)
         discovery = Discovery(protocol.port, session)
-        transport = Transport()
+        transport = Transport(protocol, sensor_protocol)
 
         stop = Event()
 

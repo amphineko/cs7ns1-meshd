@@ -4,7 +4,7 @@ from threading import Event, Thread
 from sensor import Sensor
 from time import sleep
 
-SENSOR_INTERVAL = 2
+SENSOR_INTERVAL = 5
 
 def run_sensor(sensor: Sensor, sensorType, stop: Event):
     while not stop.is_set():
